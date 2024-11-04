@@ -3,39 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Firebase Authentication</title>
+  <title>ConvoSpace</title>
   <link rel="stylesheet" href="style.css">
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-database.js"></script>
 </head>
 <body>
   <div class="container">
-    <h1>Firebase Authentication</h1>
-
+    <h1>ConvoSpace</h1>
+    
     <div id="auth-section">
-      <button id="anonymous-login">Login Anonymously</button>
-      
-      <div class="divider">or</div>
-      
-      <form id="email-login-form">
-        <input type="email" id="email" placeholder="Email" required>
-        <input type="password" id="password" placeholder="Password" required>
-        <button type="submit">Login with Email</button>
-        <button type="button" id="register">Register</button>
-      </form>
-      
-      <div class="divider">or</div>
-      
-      <button id="google-login">Login with Google</button>
+      <h2>Welcome to ConvoSpace</h2>
+      <button id="google-login">Sign In with Google</button>
+      <button id="anonymous-login">Try Anonymously</button>
     </div>
-
+    
     <div id="user-info" class="hidden">
-      <p>Welcome, <span id="user-name"></span></p>
+      <p>Welcome, <span id="user-name"></span>!</p>
       <button id="logout">Logout</button>
+      
+      <div class="community-section">
+        <h3>Create or Join Communities</h3>
+        <input type="text" id="community-name" placeholder="Community Name" required>
+        <button id="create-community">Create Community</button>
+        
+        <div id="post-section" class="hidden">
+          <input type="text" id="post-content" placeholder="Write a post..." required>
+          <button id="submit-post">Post</button>
+        </div>
+        
+        <div id="posts">
+          <h3>Posts</h3>
+          <ul id="posts-list"></ul>
+        </div>
+      </div>
     </div>
   </div>
 
   <script src="script.js"></script>
 </body>
 </html>
+
