@@ -27,6 +27,31 @@ const userName = document.getElementById("user-name");
 const communityInput = document.getElementById("community-name");
 const postContentInput = document.getElementById("post-content");
 const postsList = document.getElementById("posts-list");
+const profilePicInput = document.getElementById("profile-pic");
+const usernameInput = document.getElementById("username");
+
+// Register user with username and profile picture
+document.getElementById("register").addEventListener("click", async () => {
+  const username = usernameInput.value.trim();
+  const profilePic = profilePicInput.value.trim();
+  
+  if (username) {
+    try {
+      const userCredential = await signInAnonymously(auth);
+      const userId = userCredential.user.uid;
+
+      // Store username and profile picture in the database
+      await set(ref(db, `users/${userId}`), {
+        username,
+        profilePic,
+      });
+
+      showUserInfo(userCredential.user);
+    } catch (error) {
+      console.error("Registration error:", error);
+    }
+  }
+});
 
 // Sign in with Google
 document.getElementById("google-login").addEventListener("click", async () => {
@@ -36,16 +61,6 @@ document.getElementById("google-login").addEventListener("click", async () => {
     showUserInfo(result.user);
   } catch (error) {
     console.error("Google sign-in error:", error);
-  }
-});
-
-// Anonymous login
-document.getElementById("anonymous-login").addEventListener("click", async () => {
-  try {
-    const userCredential = await signInAnonymously(auth);
-    showUserInfo(userCredential.user);
-  } catch (error) {
-    console.error("Anonymous sign-in error:", error);
   }
 });
 
@@ -66,20 +81,22 @@ document.getElementById("create-community").addEventListener("click", () => {
     const communityRef = ref(db, `communities/${communityName}`);
     set(communityRef, { createdBy: auth.currentUser.uid });
     document.getElementById("post-section").classList.remove("hidden");
+    loadPosts(communityName); // Load posts from the newly created community
   }
 });
 
 // Post creation
 document.getElementById("submit-post").addEventListener("click", () => {
   const content = postContentInput.value.trim();
-  if (content) {
-    const postRef = push(ref(db, `posts/${communityInput.value}`));
+  const communityName = communityInput.value.trim();
+  if (content && communityName) {
+    const postRef = push(ref(db, `posts/${communityName}`));
     set(postRef, {
       userId: auth.currentUser.uid,
       content,
       timestamp: Date.now()
     });
-    postContentInput.value = "";
+    postContentInput.value = ""; // Clear the input after posting
   }
 });
 
@@ -87,7 +104,7 @@ document.getElementById("submit-post").addEventListener("click", () => {
 function loadPosts(communityName) {
   const postsRef = ref(db, `posts/${communityName}`);
   onValue(postsRef, (snapshot) => {
-    postsList.innerHTML = "";
+    postsList.innerHTML = ""; // Clear the list before loading new posts
     snapshot.forEach((childSnapshot) => {
       const post = childSnapshot.val();
       const postElement = document.createElement("li");
@@ -102,19 +119,24 @@ function showUserInfo(user) {
   authSection.classList.add("hidden");
   userInfoSection.classList.remove("hidden");
   userName.textContent = user.displayName || user.email || "Anonymous User";
+
+  // Load user's profile picture
+  const userRef = ref(db, `users/${user.uid}`);
+  onValue(userRef, (snapshot) => {
+    const userData = snapshot.val();
+    if (userData && userData.profilePic) {
+      const profileImg = document.createElement("img");
+      profileImg.src = userData.profilePic;
+      profileImg.alt = userData.username;
+      profileImg.style.width = "50px";
+      profileImg.style.borderRadius = "50%";
+      userInfoSection.prepend(profileImg);
+    }
+  });
 }
 
-// Show login section
+// Show authentication section
 function showAuthSection() {
   authSection.classList.remove("hidden");
   userInfoSection.classList.add("hidden");
 }
-
-// Check if the user is already signed in
-auth.onAuthStateChanged((user) => {
-  if (user) {
-    showUserInfo(user);
-  } else {
-    showAuthSection();
-  }
-});
