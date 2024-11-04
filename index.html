@@ -11,7 +11,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
         import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-        
+
         // Your Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBzfN_BtTw0JMgkn9D5apkrH9h4QV0jwY0",
@@ -33,7 +33,6 @@
         const authSection = document.getElementById('auth-section');
         const userInfoSection = document.getElementById('user-info');
         const usernameInput = document.getElementById('username');
-        const profilePicInput = document.getElementById('profile-pic');
         const registerButton = document.getElementById('register-button');
         const loginAnonymousButton = document.getElementById('login-anonymous');
         const loginGoogleButton = document.getElementById('login-google');
@@ -193,7 +192,6 @@
         <div id="auth-section">
             <h2>Register/Login</h2>
             <input type="text" id="username" placeholder="Enter your username" required>
-            <input type="text" id="profile-pic" placeholder="Profile picture URL (optional)">
             <button id="register-button">Register</button>
             <button id="login-anonymous">Login Anonymously</button>
             <button id="login-google">Login with Google</button>
@@ -215,3 +213,4 @@
     </div>
 </body>
 </html>
+
