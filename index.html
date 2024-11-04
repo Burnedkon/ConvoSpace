@@ -10,7 +10,7 @@
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
         
         // Your Firebase configuration
         const firebaseConfig = {
@@ -82,10 +82,10 @@
             if (email && password && username) {
                 createUserWithEmailAndPassword(auth, email, password)
                     .then((userCredential) => {
-                        showUserInfo(userCredential.user, username);
                         set(ref(db, 'users/' + userCredential.user.uid), {
                             username: username
                         });
+                        showUserInfo(userCredential.user, username);
                     })
                     .catch((error) => {
                         console.error("Error registering user:", error);
@@ -233,12 +233,11 @@
         postButton.addEventListener('click', () => {
             const content = postInput.value.trim();
             const communityName = currentCommunityName.textContent;
-            const userId = auth.currentUser.uid;
             const username = usernameInput.value || "Anonymous User";
 
             if (content && communityName) {
                 const postId = ref(db, 'posts/' + communityName).push().key;
-                const imageUrl = postImageInput.files.length > 0 ? URL.createObjectURL(postImageInput.files[0]) : null;
+                const imageUrl = postImageInput.files[0] ? URL.createObjectURL(postImageInput.files[0]) : '';
 
                 set(ref(db, 'posts/' + communityName + '/' + postId), {
                     content: content,
@@ -249,106 +248,61 @@
                     postImageInput.value = '';
                     fetchPosts(communityName);
                 }).catch((error) => {
-                    console.error("Error posting:", error);
+                    console.error("Error posting content:", error);
                 });
             }
         });
 
-        // Format post content to highlight hashtags
+        // Format post content for display
         function formatPostContent(content) {
-            return content.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
+            const hashtags = content.match(/#[\w]+/g);
+            let formattedContent = content;
+
+            if (hashtags) {
+                hashtags.forEach((hashtag) => {
+                    formattedContent = formattedContent.replace(hashtag, `<a href="#">${hashtag}</a>`);
+                });
+            }
+            return formattedContent;
         }
 
-        // Check if the user is verified
+        // Check if user is verified
         function isUserVerified(username) {
-            return username === "yesdoytome@gmail.com"; // Modify this as needed for verification
+            // Placeholder logic for checking user verification
+            return username === 'verifiedUser';
         }
     </script>
 </head>
 <body>
-    <div id="auth-section" class="container">
-        <h2>Login/Register</h2>
-        <input type="text" id="username-input" placeholder="Enter your username" required>
+    <div id="auth-section">
+        <h1>Welcome to ConvoSpace</h1>
+        <label for="username-input">Choose a username:</label>
+        <input type="text" id="username-input" placeholder="Enter username">
         <button id="register-button">Register</button>
         <button id="login-button">Login</button>
         <button id="login-anonymous">Login Anonymously</button>
     </div>
 
-    <div id="user-info" class="container hidden">
-        <h2>Welcome, <span id="user-name"></span></h2>
+    <div id="user-info" class="hidden">
+        <h2>Hello, <span id="user-name"></span>!</h2>
         <button id="logout">Logout</button>
-        <div>
-            <h3>Create Community</h3>
-            <input type="text" id="community-name" placeholder="Enter community name" required>
-            <button id="create-community">Create Community</button>
-        </div>
-        <div>
-            <h3>Available Communities</h3>
-            <div id="communities-list"></div>
-        </div>
+
+        <h3>Create a Community</h3>
+        <input type="text" id="community-name" placeholder="Community Name">
+        <button id="create-community">Create</button>
+
+        <h3>Communities</h3>
+        <div id="communities-list"></div>
+
+        <h3 id="current-community-name"></h3>
         <div id="community-post-section" class="hidden">
-            <h3 id="current-community-name"></h3>
-            <textarea id="post-input" placeholder="What's on your mind?" required></textarea>
+            <h3>Post in Community</h3>
+            <textarea id="post-input" placeholder="What's on your mind?"></textarea>
             <input type="file" id="post-image" accept="image/*">
             <button id="post-button">Post</button>
-            <h4>Posts</h4>
+            <h3>Posts</h3>
             <div id="posts-list"></div>
         </div>
     </div>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f4;
-        }
-        .container {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
-        }
-        .hidden {
-            display: none;
-        }
-        .community {
-            cursor: pointer;
-            margin: 5px 0;
-            padding: 10px;
-            background-color: #e2e2e2;
-            border-radius: 4px;
-        }
-        .post {
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-            background-color: #f9f9f9;
-        }
-        .hashtag {
-            color: blue;
-            cursor: pointer;
-        }
-        input[type="text"], textarea {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            background-color: #007bff;
-            color: white;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-    </style>
 </body>
 </html>
