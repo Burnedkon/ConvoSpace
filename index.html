@@ -7,11 +7,10 @@
     <link rel="stylesheet" href="style.css">
     <!-- Firebase SDKs -->
     <script type="module">
-        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-        
+        import { getDatabase, ref, set, push, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
         // Your Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBzfN_BtTw0JMgkn9D5apkrH9h4QV0jwY0",
@@ -63,9 +62,7 @@
             authSection.classList.add("hidden");
             userInfoSection.classList.remove("hidden");
             userNameSpan.textContent = username;
-
-            // Fetch communities
-            fetchCommunities();
+            fetchCommunities();  // Fetch communities when user is authenticated
         }
 
         // Show authentication section
@@ -134,14 +131,14 @@
                     name: communityName
                 }).then(() => {
                     communityNameInput.value = '';
-                    fetchCommunities();
+                    fetchCommunities();  // Refresh the community list
                 }).catch((error) => {
                     console.error("Error creating community:", error);
                 });
             }
         });
 
-        // Fetch communities
+        // Fetch communities from the database
         function fetchCommunities() {
             get(ref(db, 'communities/')).then((snapshot) => {
                 communitiesList.innerHTML = '';
@@ -150,22 +147,25 @@
                     const communityDiv = document.createElement('div');
                     communityDiv.textContent = community.name;
                     communityDiv.className = "community";
+                    // Join community on click
                     communityDiv.addEventListener('click', () => {
                         joinCommunity(community.name);
                     });
                     communitiesList.appendChild(communityDiv);
                 });
+            }).catch((error) => {
+                console.error("Error fetching communities:", error);
             });
         }
 
-        // Join a community
+        // Join a community and fetch posts
         function joinCommunity(name) {
             currentCommunityName.textContent = name;
             communityPostSection.classList.remove("hidden");
             fetchPosts(name);
         }
 
-        // Fetch posts from a community
+        // Fetch posts from the selected community
         function fetchPosts(communityName) {
             get(ref(db, 'posts/' + communityName)).then((snapshot) => {
                 postsList.innerHTML = '';
@@ -182,25 +182,28 @@
                     const commentButton = document.createElement('button');
 
                     textElement.innerHTML = formatPostContent(post.content);
-                    userElement.textContent = `Posted by: ${post.username} ${isUserVerified(post.username) ? '✅' : ''}`;
+                    userElement.textContent = `Posted by: ${post.username}`;
                     commentInput.placeholder = 'Add a comment...';
                     commentButton.textContent = 'Comment';
 
+                    // Comment functionality
                     commentButton.addEventListener('click', () => {
                         const comment = commentInput.value.trim();
                         if (comment) {
-                            const commentKey = ref(db, 'comments/' + postId).push().key;
-                            set(ref(db, 'comments/' + postId + '/' + commentKey), {
+                            // Create a new comment under the specific post
+                            const commentRef = ref(db, 'comments/' + postId);
+                            const newCommentRef = push(commentRef);  // Use push to generate a unique key
+                            set(newCommentRef, {
                                 content: comment,
                                 username: post.username
                             }).then(() => {
                                 commentInput.value = '';
-                                fetchComments(postId, commentsList);
+                                fetchComments(postId, commentsList);  // Refresh comments
                             });
                         }
                     });
 
-                    fetchComments(postId, commentsList);
+                    fetchComments(postId, commentsList);  // Fetch comments for the post
 
                     postElement.appendChild(textElement);
                     postElement.appendChild(userElement);
@@ -220,8 +223,8 @@
                 commentsList.innerHTML = '';
                 snapshot.forEach((childSnapshot) => {
                     const comment = childSnapshot.val();
-                    const commentElement = document.createElement('p');
-                    commentElement.innerHTML = `<strong>${comment.username}</strong>: ${comment.content}`;
+                    const commentElement = document.createElement('div');
+                    commentElement.textContent = `${comment.username}: ${comment.content}`;
                     commentsList.appendChild(commentElement);
                 });
             }).catch((error) => {
@@ -229,24 +232,26 @@
             });
         }
 
-        // Post content to a community
+        // Post content in the selected community
         postButton.addEventListener('click', () => {
             const content = postInput.value.trim();
             const communityName = currentCommunityName.textContent;
-            const username = usernameInput.value || "Anonymous User";
+            const username = userNameSpan.textContent;
 
             if (content && communityName) {
-                const postId = ref(db, 'posts/' + communityName).push().key;
+                const postRef = ref(db, 'posts/' + communityName);
+                const newPostRef = push(postRef);  // Use push to generate a unique key for each post
                 const imageUrl = postImageInput.files[0] ? URL.createObjectURL(postImageInput.files[0]) : '';
 
-                set(ref(db, 'posts/' + communityName + '/' + postId), {
+                // Set the new post in the database
+                set(newPostRef, {
                     content: content,
                     username: username,
                     imageUrl: imageUrl
                 }).then(() => {
                     postInput.value = '';
                     postImageInput.value = '';
-                    fetchPosts(communityName);
+                    fetchPosts(communityName);  // Refresh posts
                 }).catch((error) => {
                     console.error("Error posting content:", error);
                 });
@@ -266,9 +271,8 @@
             return formattedContent;
         }
 
-        // Check if user is verified
+        // Check if user is verified (placeholder logic)
         function isUserVerified(username) {
-            // Placeholder logic for checking user verification
             return username === 'verifiedUser';
         }
     </script>
