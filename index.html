@@ -7,10 +7,10 @@
     <link rel="stylesheet" href="style.css">
     <!-- Firebase SDKs -->
     <script type="module">
-        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getDatabase, ref, set, get, push } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js";
 
         // Your Firebase configuration
         const firebaseConfig = {
@@ -28,6 +28,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getDatabase(app);
+        const storage = getStorage(app);
 
         // UI Elements
         const authSection = document.getElementById('auth-section');
@@ -42,6 +43,7 @@
         const communitiesList = document.getElementById('communities-list');
         const currentCommunityName = document.getElementById('current-community-name');
         const postInput = document.getElementById('post-input');
+        const postImageInput = document.getElementById('post-image');
         const postButton = document.getElementById('post-button');
         const postsList = document.getElementById('posts-list');
         const communityPostSection = document.getElementById('community-post-section');
@@ -50,18 +52,17 @@
         // Authentication listeners
         auth.onAuthStateChanged((user) => {
             if (user) {
-                const username = usernameInput.value || "Anonymous User";
-                showUserInfo(user, username);
+                showUserInfo(user);
             } else {
                 showAuthSection();
             }
         });
 
         // Show user info
-        function showUserInfo(user, username) {
+        function showUserInfo(user) {
             authSection.classList.add("hidden");
             userInfoSection.classList.remove("hidden");
-            userNameSpan.textContent = username;
+            userNameSpan.textContent = usernameInput.value || "Anonymous User";
 
             // Fetch communities
             fetchCommunities();
@@ -80,8 +81,7 @@
             if (email && password) {
                 createUserWithEmailAndPassword(auth, email, password)
                     .then((userCredential) => {
-                        const user = userCredential.user;
-                        showUserInfo(user, usernameInput.value);
+                        showUserInfo(userCredential.user);
                     })
                     .catch((error) => {
                         console.error("Error registering user:", error);
@@ -92,36 +92,18 @@
         // Login anonymously
         loginAnonymousButton.addEventListener('click', () => {
             signInAnonymously(auth).then((userCredential) => {
-                const user = userCredential.user;
-                showUserInfo(user, usernameInput.value);
+                showUserInfo(userCredential.user);
             }).catch((error) => {
                 console.error("Error logging in anonymously:", error);
             });
         });
 
-        // Login with Google
-        loginGoogleButton.addEventListener('click', () => {
-            const provider = new GoogleAuthProvider();
-            signInWithPopup(auth, provider).then((result) => {
-                const user = result.user;
-                showUserInfo(user, usernameInput.value);
-            }).catch((error) => {
-                console.error("Error logging in with Google:", error);
-            });
-        });
-
-        // Logout
-        logoutButton.addEventListener('click', () => {
-            signOut(auth).then(() => {
-                showAuthSection();
-            });
-        });
-
         // Create a community
         createCommunityButton.addEventListener('click', () => {
-            const communityName = communityNameInput.value.trim();
+            const communityName = communityNameInput.value;
             if (communityName) {
-                set(ref(db, 'communities/' + communityName), {
+                const communityRef = ref(db, 'communities/' + communityName);
+                set(communityRef, {
                     name: communityName
                 }).then(() => {
                     communityNameInput.value = '';
@@ -132,85 +114,178 @@
             }
         });
 
-        // Fetch communities
+        // Fetch and display communities
         function fetchCommunities() {
-            get(ref(db, 'communities/')).then((snapshot) => {
+            const communitiesRef = ref(db, 'communities/');
+            get(communitiesRef).then((snapshot) => {
                 communitiesList.innerHTML = '';
                 snapshot.forEach((childSnapshot) => {
                     const community = childSnapshot.val();
-                    const communityDiv = document.createElement('div');
-                    communityDiv.textContent = community.name;
-                    communityDiv.className = "community";
-                    communityDiv.addEventListener('click', () => {
-                        joinCommunity(community.name);
-                    });
-                    communitiesList.appendChild(communityDiv);
+                    const li = document.createElement('li');
+                    li.textContent = community.name;
+                    li.addEventListener('click', () => joinCommunity(community.name));
+                    communitiesList.appendChild(li);
                 });
+            }).catch((error) => {
+                console.error("Error fetching communities:", error);
             });
         }
 
         // Join a community
-        function joinCommunity(name) {
-            currentCommunityName.textContent = name;
-            communityPostSection.classList.remove("hidden");
-            fetchPosts(name);
+        function joinCommunity(communityName) {
+            currentCommunityName.textContent = communityName;
+            postButton.onclick = () => postMessage(communityName);
+            communityPostSection.classList.remove('hidden');
+            fetchPosts(communityName);
         }
 
-        // Fetch posts from a community
-        function fetchPosts(communityName) {
-            get(ref(db, 'posts/' + communityName)).then((snapshot) => {
-                postsList.innerHTML = '';
-                snapshot.forEach((childSnapshot) => {
-                    const post = childSnapshot.val();
-                    const postDiv = document.createElement('div');
-                    postDiv.textContent = post.content;
-                    postsList.appendChild(postDiv);
+        // Post message in a community
+        function postMessage(communityName) {
+            const postText = postInput.value;
+            const imageFile = postImageInput.files[0];
+
+            const postRef = ref(db, 'communities/' + communityName + '/posts');
+            const newPostRef = push(postRef);
+
+            if (imageFile) {
+                const imageRef = storageRef(storage, `images/${newPostRef.key}`);
+                uploadBytes(imageRef, imageFile).then(() => {
+                    return getDownloadURL(imageRef);
+                }).then((downloadURL) => {
+                    set(newPostRef, {
+                        text: postText,
+                        image: downloadURL,
+                        user: userNameSpan.textContent,
+                        timestamp: Date.now()
+                    }).then(() => {
+                        postInput.value = '';
+                        postImageInput.value = '';
+                        fetchPosts(communityName);
+                    });
+                }).catch((error) => {
+                    console.error("Error uploading image:", error);
                 });
-            });
-        }
-
-        // Post content to a community
-        postButton.addEventListener('click', () => {
-            const content = postInput.value.trim();
-            const communityName = currentCommunityName.textContent;
-            if (content && communityName) {
-                const newPostKey = ref(db, 'posts/' + communityName).push().key;
-                set(ref(db, 'posts/' + communityName + '/' + newPostKey), {
-                    content: content
+            } else {
+                set(newPostRef, {
+                    text: postText,
+                    user: userNameSpan.textContent,
+                    timestamp: Date.now()
                 }).then(() => {
                     postInput.value = '';
                     fetchPosts(communityName);
                 }).catch((error) => {
-                    console.error("Error posting:", error);
+                    console.error("Error posting message:", error);
                 });
             }
+        }
+
+        // Fetch and display posts in the community
+        function fetchPosts(communityName) {
+            const postsRef = ref(db, 'communities/' + communityName + '/posts');
+            get(postsRef).then((snapshot) => {
+                postsList.innerHTML = '';
+                snapshot.forEach((childSnapshot) => {
+                    const post = childSnapshot.val();
+                    const postElement = document.createElement('div');
+                    postElement.className = 'post';
+
+                    const textElement = document.createElement('p');
+                    textElement.textContent = post.text;
+
+                    if (post.image) {
+                        const imgElement = document.createElement('img');
+                        imgElement.src = post.image;
+                        imgElement.alt = 'Posted Image';
+                        imgElement.className = 'post-image';
+                        postElement.appendChild(imgElement);
+                    }
+
+                    const userElement = document.createElement('small');
+                    userElement.textContent = `Posted by: ${post.user} on ${new Date(post.timestamp).toLocaleString()}`;
+                    
+                    postElement.appendChild(textElement);
+                    postElement.appendChild(userElement);
+                    postsList.appendChild(postElement);
+                });
+            }).catch((error) => {
+                console.error("Error fetching posts:", error);
+            });
+        }
+
+        // Logout
+        logoutButton.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                showAuthSection();
+            }).catch((error) => {
+                console.error("Error logging out:", error);
+            });
         });
     </script>
 </head>
 <body>
-    <div id="app">
-        <div id="auth-section">
-            <h2>Register/Login</h2>
-            <input type="text" id="username" placeholder="Enter your username" required>
-            <button id="register-button">Register</button>
-            <button id="login-anonymous">Login Anonymously</button>
-            <button id="login-google">Login with Google</button>
-        </div>
-
-        <div id="user-info" class="hidden">
-            <h2>Welcome, <span id="user-name"></span></h2>
-            <button id="logout">Logout</button>
-            <input type="text" id="community-name" placeholder="Enter community name" required>
-            <button id="create-community">Create Community</button>
-            <div id="communities-list"></div>
-            <div id="community-post-section" class="hidden">
-                <h3>Community: <span id="current-community-name"></span></h3>
-                <input type="text" id="post-input" placeholder="Write a post...">
-                <button id="post-button">Post</button>
-                <div id="posts-list"></div>
-            </div>
-        </div>
+    <div id="auth-section">
+        <h2>Login or Register</h2>
+        <button id="register-button">Register</button>
+        <button id="login-anonymous">Login Anonymously</button>
+        <button id="login-google">Login with Google</button>
     </div>
+
+    <div id="user-info" class="hidden">
+        <h2>Welcome, <span id="user-name"></span></h2>
+        <button id="logout">Logout</button>
+        <h3>Create a Community</h3>
+        <input type="text" id="community-name" placeholder="Community Name">
+        <button id="create-community">Create</button>
+        <h3>Available Communities</h3>
+        <ul id="communities-list"></ul>
+    </div>
+
+    <div id="community-post-section" class="hidden">
+        <h2>Current Community: <span id="current-community-name"></span></h2>
+        <textarea id="post-input" placeholder="What's on your mind?"></textarea>
+        <input type="file" id="post-image" accept="image/*">
+        <button id="post-button">Post</button>
+        <h3>Posts</h3>
+        <div id="posts-list"></div>
+    </div>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h2 {
+            color: #333;
+        }
+        #auth-section, #user-info, #community-post-section {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            border-radius: 5px;
+        }
+        .hidden {
+            display: none;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+        }
+        .post {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #fff;
+            border-radius: 5px;
+        }
+        .post-image {
+            max-width: 100%;
+            height: auto;
+            margin-top: 10px;
+        }
+    </style>
 </body>
 </html>
-
