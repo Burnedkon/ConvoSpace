@@ -7,11 +7,11 @@
     <link rel="stylesheet" href="style.css">
     <!-- Firebase SDKs -->
     <script type="module">
+        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { getDatabase, ref, set, get, push } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js";
-
+        import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        
         // Your Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBzfN_BtTw0JMgkn9D5apkrH9h4QV0jwY0",
@@ -28,15 +28,14 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getDatabase(app);
-        const storage = getStorage(app);
 
         // UI Elements
         const authSection = document.getElementById('auth-section');
         const userInfoSection = document.getElementById('user-info');
-        const usernameInput = document.getElementById('username');
+        const usernameInput = document.getElementById('username-input');
         const registerButton = document.getElementById('register-button');
+        const loginButton = document.getElementById('login-button');
         const loginAnonymousButton = document.getElementById('login-anonymous');
-        const loginGoogleButton = document.getElementById('login-google');
         const logoutButton = document.getElementById('logout');
         const communityNameInput = document.getElementById('community-name');
         const createCommunityButton = document.getElementById('create-community');
@@ -52,17 +51,18 @@
         // Authentication listeners
         auth.onAuthStateChanged((user) => {
             if (user) {
-                showUserInfo(user);
+                const username = usernameInput.value || "Anonymous User";
+                showUserInfo(user, username);
             } else {
                 showAuthSection();
             }
         });
 
         // Show user info
-        function showUserInfo(user) {
+        function showUserInfo(user, username) {
             authSection.classList.add("hidden");
             userInfoSection.classList.remove("hidden");
-            userNameSpan.textContent = usernameInput.value || "Anonymous User";
+            userNameSpan.textContent = username;
 
             // Fetch communities
             fetchCommunities();
@@ -78,10 +78,14 @@
         registerButton.addEventListener('click', () => {
             const email = prompt("Enter your email:");
             const password = prompt("Enter your password:");
-            if (email && password) {
+            const username = usernameInput.value.trim();
+            if (email && password && username) {
                 createUserWithEmailAndPassword(auth, email, password)
                     .then((userCredential) => {
-                        showUserInfo(userCredential.user);
+                        showUserInfo(userCredential.user, username);
+                        set(ref(db, 'users/' + userCredential.user.uid), {
+                            username: username
+                        });
                     })
                     .catch((error) => {
                         console.error("Error registering user:", error);
@@ -89,21 +93,44 @@
             }
         });
 
+        // Login with email and password
+        loginButton.addEventListener('click', () => {
+            const email = prompt("Enter your email:");
+            const password = prompt("Enter your password:");
+            if (email && password) {
+                signInWithEmailAndPassword(auth, email, password)
+                    .then((userCredential) => {
+                        showUserInfo(userCredential.user, usernameInput.value);
+                    })
+                    .catch((error) => {
+                        console.error("Error logging in:", error);
+                    });
+            }
+        });
+
         // Login anonymously
         loginAnonymousButton.addEventListener('click', () => {
             signInAnonymously(auth).then((userCredential) => {
-                showUserInfo(userCredential.user);
+                showUserInfo(userCredential.user, "Anonymous User");
             }).catch((error) => {
                 console.error("Error logging in anonymously:", error);
             });
         });
 
+        // Logout
+        logoutButton.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                showAuthSection();
+            }).catch((error) => {
+                console.error("Error logging out:", error);
+            });
+        });
+
         // Create a community
         createCommunityButton.addEventListener('click', () => {
-            const communityName = communityNameInput.value;
+            const communityName = communityNameInput.value.trim();
             if (communityName) {
-                const communityRef = ref(db, 'communities/' + communityName);
-                set(communityRef, {
+                set(ref(db, 'communities/' + communityName), {
                     name: communityName
                 }).then(() => {
                     communityNameInput.value = '';
@@ -114,95 +141,42 @@
             }
         });
 
-        // Fetch and display communities
+        // Fetch communities
         function fetchCommunities() {
-            const communitiesRef = ref(db, 'communities/');
-            get(communitiesRef).then((snapshot) => {
+            get(ref(db, 'communities/')).then((snapshot) => {
                 communitiesList.innerHTML = '';
                 snapshot.forEach((childSnapshot) => {
                     const community = childSnapshot.val();
-                    const li = document.createElement('li');
-                    li.textContent = community.name;
-                    li.addEventListener('click', () => joinCommunity(community.name));
-                    communitiesList.appendChild(li);
+                    const communityDiv = document.createElement('div');
+                    communityDiv.textContent = community.name;
+                    communityDiv.className = "community";
+                    communityDiv.addEventListener('click', () => {
+                        joinCommunity(community.name);
+                    });
+                    communitiesList.appendChild(communityDiv);
                 });
-            }).catch((error) => {
-                console.error("Error fetching communities:", error);
             });
         }
 
         // Join a community
-        function joinCommunity(communityName) {
-            currentCommunityName.textContent = communityName;
-            postButton.onclick = () => postMessage(communityName);
-            communityPostSection.classList.remove('hidden');
-            fetchPosts(communityName);
+        function joinCommunity(name) {
+            currentCommunityName.textContent = name;
+            communityPostSection.classList.remove("hidden");
+            fetchPosts(name);
         }
 
-        // Post message in a community
-        function postMessage(communityName) {
-            const postText = postInput.value;
-            const imageFile = postImageInput.files[0];
-
-            const postRef = ref(db, 'communities/' + communityName + '/posts');
-            const newPostRef = push(postRef);
-
-            if (imageFile) {
-                const imageRef = storageRef(storage, `images/${newPostRef.key}`);
-                uploadBytes(imageRef, imageFile).then(() => {
-                    return getDownloadURL(imageRef);
-                }).then((downloadURL) => {
-                    set(newPostRef, {
-                        text: postText,
-                        image: downloadURL,
-                        user: userNameSpan.textContent,
-                        timestamp: Date.now()
-                    }).then(() => {
-                        postInput.value = '';
-                        postImageInput.value = '';
-                        fetchPosts(communityName);
-                    });
-                }).catch((error) => {
-                    console.error("Error uploading image:", error);
-                });
-            } else {
-                set(newPostRef, {
-                    text: postText,
-                    user: userNameSpan.textContent,
-                    timestamp: Date.now()
-                }).then(() => {
-                    postInput.value = '';
-                    fetchPosts(communityName);
-                }).catch((error) => {
-                    console.error("Error posting message:", error);
-                });
-            }
-        }
-
-        // Fetch and display posts in the community
+        // Fetch posts from a community
         function fetchPosts(communityName) {
-            const postsRef = ref(db, 'communities/' + communityName + '/posts');
-            get(postsRef).then((snapshot) => {
+            get(ref(db, 'posts/' + communityName)).then((snapshot) => {
                 postsList.innerHTML = '';
                 snapshot.forEach((childSnapshot) => {
                     const post = childSnapshot.val();
                     const postElement = document.createElement('div');
-                    postElement.className = 'post';
-
                     const textElement = document.createElement('p');
-                    textElement.textContent = post.text;
+                    const userElement = document.createElement('span');
 
-                    if (post.image) {
-                        const imgElement = document.createElement('img');
-                        imgElement.src = post.image;
-                        imgElement.alt = 'Posted Image';
-                        imgElement.className = 'post-image';
-                        postElement.appendChild(imgElement);
-                    }
-
-                    const userElement = document.createElement('small');
-                    userElement.textContent = `Posted by: ${post.user} on ${new Date(post.timestamp).toLocaleString()}`;
-                    
+                    textElement.textContent = post.content;
+                    userElement.textContent = `Posted by: ${post.username}`;
                     postElement.appendChild(textElement);
                     postElement.appendChild(userElement);
                     postsList.appendChild(postElement);
@@ -212,80 +186,53 @@
             });
         }
 
-        // Logout
-        logoutButton.addEventListener('click', () => {
-            signOut(auth).then(() => {
-                showAuthSection();
-            }).catch((error) => {
-                console.error("Error logging out:", error);
-            });
+        // Post content to a community
+        postButton.addEventListener('click', () => {
+            const content = postInput.value.trim();
+            const communityName = currentCommunityName.textContent;
+            const userId = auth.currentUser.uid;
+            const username = usernameInput.value || "Anonymous User";
+            if (content && communityName) {
+                const newPostKey = ref(db, 'posts/' + communityName).push().key;
+                set(ref(db, 'posts/' + communityName + '/' + newPostKey), {
+                    content: content,
+                    username: username
+                }).then(() => {
+                    postInput.value = '';
+                    fetchPosts(communityName);
+                }).catch((error) => {
+                    console.error("Error posting:", error);
+                });
+            }
         });
     </script>
 </head>
 <body>
     <div id="auth-section">
-        <h2>Login or Register</h2>
+        <h2>Login/Register</h2>
+        <input type="text" id="username-input" placeholder="Enter your username" required>
         <button id="register-button">Register</button>
+        <button id="login-button">Login</button>
         <button id="login-anonymous">Login Anonymously</button>
-        <button id="login-google">Login with Google</button>
     </div>
 
     <div id="user-info" class="hidden">
-        <h2>Welcome, <span id="user-name"></span></h2>
+        <h2>Welcome, <span id="user-name"></span>!</h2>
         <button id="logout">Logout</button>
         <h3>Create a Community</h3>
         <input type="text" id="community-name" placeholder="Community Name">
-        <button id="create-community">Create</button>
-        <h3>Available Communities</h3>
-        <ul id="communities-list"></ul>
-    </div>
+        <button id="create-community">Create Community</button>
 
-    <div id="community-post-section" class="hidden">
-        <h2>Current Community: <span id="current-community-name"></span></h2>
-        <textarea id="post-input" placeholder="What's on your mind?"></textarea>
-        <input type="file" id="post-image" accept="image/*">
-        <button id="post-button">Post</button>
-        <h3>Posts</h3>
-        <div id="posts-list"></div>
+        <h3>Join a Community</h3>
+        <ul id="communities-list"></ul>
+
+        <h3 id="current-community-name"></h3>
+        <div id="community-post-section" class="hidden">
+            <textarea id="post-input" placeholder="Write your post..."></textarea>
+            <button id="post-button">Post</button>
+            <h4>Posts:</h4>
+            <div id="posts-list"></div>
+        </div>
     </div>
-    
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f9f9f9;
-        }
-        h2 {
-            color: #333;
-        }
-        #auth-section, #user-info, #community-post-section {
-            margin-bottom: 20px;
-            padding: 20px;
-            border: 1px solid #ccc;
-            background-color: #fff;
-            border-radius: 5px;
-        }
-        .hidden {
-            display: none;
-        }
-        textarea {
-            width: 100%;
-            height: 100px;
-            margin-bottom: 10px;
-        }
-        .post {
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 10px;
-            background-color: #fff;
-            border-radius: 5px;
-        }
-        .post-image {
-            max-width: 100%;
-            height: auto;
-            margin-top: 10px;
-        }
-    </style>
 </body>
 </html>
