@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ConvoSpace</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-database.js"></script>
@@ -16,6 +15,9 @@
     
     <div id="auth-section">
       <h2>Welcome to ConvoSpace</h2>
+      <input type="text" id="username" placeholder="Enter your username" required>
+      <input type="url" id="profile-pic" placeholder="Profile Picture URL (optional)">
+      <button id="register">Register</button>
       <button id="google-login">Sign In with Google</button>
       <button id="anonymous-login">Try Anonymously</button>
     </div>
@@ -45,4 +47,3 @@
   <script src="script.js"></script>
 </body>
 </html>
-
