@@ -171,18 +171,61 @@
                 postsList.innerHTML = '';
                 snapshot.forEach((childSnapshot) => {
                     const post = childSnapshot.val();
+                    const postId = childSnapshot.key;
+
                     const postElement = document.createElement('div');
+                    postElement.className = 'post';
                     const textElement = document.createElement('p');
                     const userElement = document.createElement('span');
+                    const commentsList = document.createElement('div');
+                    const commentInput = document.createElement('input');
+                    const commentButton = document.createElement('button');
 
-                    textElement.textContent = post.content;
-                    userElement.textContent = `Posted by: ${post.username}`;
+                    textElement.innerHTML = formatPostContent(post.content);
+                    userElement.textContent = `Posted by: ${post.username} ${isUserVerified(post.username) ? '✅' : ''}`;
+                    commentInput.placeholder = 'Add a comment...';
+                    commentButton.textContent = 'Comment';
+
+                    commentButton.addEventListener('click', () => {
+                        const comment = commentInput.value.trim();
+                        if (comment) {
+                            const commentKey = ref(db, 'comments/' + postId).push().key;
+                            set(ref(db, 'comments/' + postId + '/' + commentKey), {
+                                content: comment,
+                                username: post.username
+                            }).then(() => {
+                                commentInput.value = '';
+                                fetchComments(postId, commentsList);
+                            });
+                        }
+                    });
+
+                    fetchComments(postId, commentsList);
+
                     postElement.appendChild(textElement);
                     postElement.appendChild(userElement);
+                    postElement.appendChild(commentInput);
+                    postElement.appendChild(commentButton);
+                    postElement.appendChild(commentsList);
                     postsList.appendChild(postElement);
                 });
             }).catch((error) => {
                 console.error("Error fetching posts:", error);
+            });
+        }
+
+        // Fetch comments for a post
+        function fetchComments(postId, commentsList) {
+            get(ref(db, 'comments/' + postId)).then((snapshot) => {
+                commentsList.innerHTML = '';
+                snapshot.forEach((childSnapshot) => {
+                    const comment = childSnapshot.val();
+                    const commentElement = document.createElement('p');
+                    commentElement.innerHTML = `<strong>${comment.username}</strong>: ${comment.content}`;
+                    commentsList.appendChild(commentElement);
+                });
+            }).catch((error) => {
+                console.error("Error fetching comments:", error);
             });
         }
 
@@ -192,23 +235,38 @@
             const communityName = currentCommunityName.textContent;
             const userId = auth.currentUser.uid;
             const username = usernameInput.value || "Anonymous User";
+
             if (content && communityName) {
-                const newPostKey = ref(db, 'posts/' + communityName).push().key;
-                set(ref(db, 'posts/' + communityName + '/' + newPostKey), {
+                const postId = ref(db, 'posts/' + communityName).push().key;
+                const imageUrl = postImageInput.files.length > 0 ? URL.createObjectURL(postImageInput.files[0]) : null;
+
+                set(ref(db, 'posts/' + communityName + '/' + postId), {
                     content: content,
-                    username: username
+                    username: username,
+                    imageUrl: imageUrl
                 }).then(() => {
                     postInput.value = '';
+                    postImageInput.value = '';
                     fetchPosts(communityName);
                 }).catch((error) => {
                     console.error("Error posting:", error);
                 });
             }
         });
+
+        // Format post content to highlight hashtags
+        function formatPostContent(content) {
+            return content.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
+        }
+
+        // Check if the user is verified
+        function isUserVerified(username) {
+            return username === "yesdoytome@gmail.com"; // Modify this as needed for verification
+        }
     </script>
 </head>
 <body>
-    <div id="auth-section">
+    <div id="auth-section" class="container">
         <h2>Login/Register</h2>
         <input type="text" id="username-input" placeholder="Enter your username" required>
         <button id="register-button">Register</button>
@@ -216,23 +274,81 @@
         <button id="login-anonymous">Login Anonymously</button>
     </div>
 
-    <div id="user-info" class="hidden">
-        <h2>Welcome, <span id="user-name"></span>!</h2>
+    <div id="user-info" class="container hidden">
+        <h2>Welcome, <span id="user-name"></span></h2>
         <button id="logout">Logout</button>
-        <h3>Create a Community</h3>
-        <input type="text" id="community-name" placeholder="Community Name">
-        <button id="create-community">Create Community</button>
-
-        <h3>Join a Community</h3>
-        <ul id="communities-list"></ul>
-
-        <h3 id="current-community-name"></h3>
+        <div>
+            <h3>Create Community</h3>
+            <input type="text" id="community-name" placeholder="Enter community name" required>
+            <button id="create-community">Create Community</button>
+        </div>
+        <div>
+            <h3>Available Communities</h3>
+            <div id="communities-list"></div>
+        </div>
         <div id="community-post-section" class="hidden">
-            <textarea id="post-input" placeholder="Write your post..."></textarea>
+            <h3 id="current-community-name"></h3>
+            <textarea id="post-input" placeholder="What's on your mind?" required></textarea>
+            <input type="file" id="post-image" accept="image/*">
             <button id="post-button">Post</button>
-            <h4>Posts:</h4>
+            <h4>Posts</h4>
             <div id="posts-list"></div>
         </div>
     </div>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+        .community {
+            cursor: pointer;
+            margin: 5px 0;
+            padding: 10px;
+            background-color: #e2e2e2;
+            border-radius: 4px;
+        }
+        .post {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .hashtag {
+            color: blue;
+            cursor: pointer;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </body>
 </html>
