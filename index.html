@@ -1,13 +1,14 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ConvoSpace</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
 </head>
 <body>
     <div id="app">
@@ -15,6 +16,7 @@
             <h2>Register/Login</h2>
             <input type="text" id="username" placeholder="Enter your username" required>
             <input type="text" id="profile-pic" placeholder="Profile picture URL (optional)">
+            <button id="register-button">Register</button>
             <button id="login-anonymous">Login Anonymously</button>
             <button id="login-google">Login with Google</button>
         </div>
