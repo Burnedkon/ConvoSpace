@@ -1,142 +1,174 @@
-// Import Firebase dependencies
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-app.js";
-import { getAuth, signInAnonymously, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-auth.js";
-import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-database.js";
-
-// Firebase configuration
+// Your Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBzfN_BtTw0JMgkn9D5apkrH9h4QV0jwY0",
-  authDomain: "convospace-e4d4f.firebaseapp.com",
-  databaseURL: "https://convospace-e4d4f-default-rtdb.firebaseio.com",
-  projectId: "convospace-e4d4f",
-  storageBucket: "convospace-e4d4f.firebasestorage.app",
-  messagingSenderId: "239356822811",
-  appId: "1:239356822811:web:33db35f2243c2161f03fbe",
-  measurementId: "G-TMWZSHDBQL"
+    apiKey: "AIzaSyBzfN_BtTw0JMgkn9D5apkrH9h4QV0jwY0",
+    authDomain: "convospace-e4d4f.firebaseapp.com",
+    databaseURL: "https://convospace-e4d4f-default-rtdb.firebaseio.com",
+    projectId: "convospace-e4d4f",
+    storageBucket: "convospace-e4d4f.appspot.com",
+    messagingSenderId: "239356822811",
+    appId: "1:239356822811:web:33db35f2243c2161f03fbe",
+    measurementId: "G-TMWZSHDBQL"
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
 
-// DOM Elements
-const authSection = document.getElementById("auth-section");
-const userInfoSection = document.getElementById("user-info");
-const userName = document.getElementById("user-name");
-const communityInput = document.getElementById("community-name");
-const postContentInput = document.getElementById("post-content");
-const postsList = document.getElementById("posts-list");
-const profilePicInput = document.getElementById("profile-pic");
-const usernameInput = document.getElementById("username");
+// UI Elements
+const authSection = document.getElementById('auth-section');
+const userInfoSection = document.getElementById('user-info');
+const usernameInput = document.getElementById('username');
+const profilePicInput = document.getElementById('profile-pic');
+const registerButton = document.getElementById('register-button');
+const loginAnonymousButton = document.getElementById('login-anonymous');
+const loginGoogleButton = document.getElementById('login-google');
+const logoutButton = document.getElementById('logout');
+const communityNameInput = document.getElementById('community-name');
+const createCommunityButton = document.getElementById('create-community');
+const communitiesList = document.getElementById('communities-list');
+const currentCommunityName = document.getElementById('current-community-name');
+const postInput = document.getElementById('post-input');
+const postButton = document.getElementById('post-button');
+const postsList = document.getElementById('posts-list');
+const communityPostSection = document.getElementById('community-post-section');
+const userNameSpan = document.getElementById('user-name');
 
-// Register user with username and profile picture
-document.getElementById("register").addEventListener("click", async () => {
-  const username = usernameInput.value.trim();
-  const profilePic = profilePicInput.value.trim();
-  
-  if (username) {
-    try {
-      const userCredential = await signInAnonymously(auth);
-      const userId = userCredential.user.uid;
-
-      // Store username and profile picture in the database
-      await set(ref(db, `users/${userId}`), {
-        username,
-        profilePic,
-      });
-
-      showUserInfo(userCredential.user);
-    } catch (error) {
-      console.error("Registration error:", error);
+// Authentication listeners
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        const username = usernameInput.value || "Anonymous User";
+        showUserInfo(user, username);
+    } else {
+        showAuthSection();
     }
-  }
 });
-
-// Sign in with Google
-document.getElementById("google-login").addEventListener("click", async () => {
-  const provider = new GoogleAuthProvider();
-  try {
-    const result = await signInWithPopup(auth, provider);
-    showUserInfo(result.user);
-  } catch (error) {
-    console.error("Google sign-in error:", error);
-  }
-});
-
-// Log out
-document.getElementById("logout").addEventListener("click", async () => {
-  try {
-    await signOut(auth);
-    showAuthSection();
-  } catch (error) {
-    console.error("Logout error:", error);
-  }
-});
-
-// Community creation
-document.getElementById("create-community").addEventListener("click", () => {
-  const communityName = communityInput.value.trim();
-  if (communityName) {
-    const communityRef = ref(db, `communities/${communityName}`);
-    set(communityRef, { createdBy: auth.currentUser.uid });
-    document.getElementById("post-section").classList.remove("hidden");
-    loadPosts(communityName); // Load posts from the newly created community
-  }
-});
-
-// Post creation
-document.getElementById("submit-post").addEventListener("click", () => {
-  const content = postContentInput.value.trim();
-  const communityName = communityInput.value.trim();
-  if (content && communityName) {
-    const postRef = push(ref(db, `posts/${communityName}`));
-    set(postRef, {
-      userId: auth.currentUser.uid,
-      content,
-      timestamp: Date.now()
-    });
-    postContentInput.value = ""; // Clear the input after posting
-  }
-});
-
-// Load posts
-function loadPosts(communityName) {
-  const postsRef = ref(db, `posts/${communityName}`);
-  onValue(postsRef, (snapshot) => {
-    postsList.innerHTML = ""; // Clear the list before loading new posts
-    snapshot.forEach((childSnapshot) => {
-      const post = childSnapshot.val();
-      const postElement = document.createElement("li");
-      postElement.textContent = post.content;
-      postsList.appendChild(postElement);
-    });
-  });
-}
 
 // Show user info
-function showUserInfo(user) {
-  authSection.classList.add("hidden");
-  userInfoSection.classList.remove("hidden");
-  userName.textContent = user.displayName || user.email || "Anonymous User";
+function showUserInfo(user, username) {
+    authSection.classList.add("hidden");
+    userInfoSection.classList.remove("hidden");
+    userNameSpan.textContent = username;
 
-  // Load user's profile picture
-  const userRef = ref(db, `users/${user.uid}`);
-  onValue(userRef, (snapshot) => {
-    const userData = snapshot.val();
-    if (userData && userData.profilePic) {
-      const profileImg = document.createElement("img");
-      profileImg.src = userData.profilePic;
-      profileImg.alt = userData.username;
-      profileImg.style.width = "50px";
-      profileImg.style.borderRadius = "50%";
-      userInfoSection.prepend(profileImg);
-    }
-  });
+    // Fetch communities
+    fetchCommunities();
 }
 
 // Show authentication section
 function showAuthSection() {
-  authSection.classList.remove("hidden");
-  userInfoSection.classList.add("hidden");
+    authSection.classList.remove("hidden");
+    userInfoSection.classList.add("hidden");
 }
+
+// Register a new user with email and password
+registerButton.addEventListener('click', () => {
+    const email = prompt("Enter your email:");
+    const password = prompt("Enter your password:");
+    if (email && password) {
+        auth.createUserWithEmailAndPassword(email, password)
+            .then((userCredential) => {
+                const user = userCredential.user;
+                showUserInfo(user, usernameInput.value);
+            })
+            .catch((error) => {
+                console.error("Error registering user:", error);
+            });
+    }
+});
+
+// Login anonymously
+loginAnonymousButton.addEventListener('click', () => {
+    auth.signInAnonymously().then((userCredential) => {
+        const user = userCredential.user;
+        showUserInfo(user, usernameInput.value);
+    }).catch((error) => {
+        console.error("Error logging in anonymously:", error);
+    });
+});
+
+// Login with Google
+loginGoogleButton.addEventListener('click', () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).then((result) => {
+        const user = result.user;
+        showUserInfo(user, usernameInput.value);
+    }).catch((error) => {
+        console.error("Error logging in with Google:", error);
+    });
+});
+
+// Logout
+logoutButton.addEventListener('click', () => {
+    auth.signOut().then(() => {
+        showAuthSection();
+    });
+});
+
+// Create a community
+createCommunityButton.addEventListener('click', () => {
+    const communityName = communityNameInput.value.trim();
+    if (communityName) {
+        db.ref('communities/' + communityName).set({
+            name: communityName
+        }).then(() => {
+            communityNameInput.value = '';
+            fetchCommunities();
+        }).catch((error) => {
+            console.error("Error creating community:", error);
+        });
+    }
+});
+
+// Fetch communities
+function fetchCommunities() {
+    db.ref('communities/').once('value').then((snapshot) => {
+        communitiesList.innerHTML = '';
+        snapshot.forEach((childSnapshot) => {
+            const community = childSnapshot.val();
+            const communityDiv = document.createElement('div');
+            communityDiv.textContent = community.name;
+            communityDiv.className = "community";
+            communityDiv.addEventListener('click', () => {
+                joinCommunity(community.name);
+            });
+            communitiesList.appendChild(communityDiv);
+        });
+    });
+}
+
+// Join a community
+function joinCommunity(name) {
+    currentCommunityName.textContent = name;
+    communityPostSection.classList.remove("hidden");
+    fetchPosts(name);
+}
+
+// Fetch posts from a community
+function fetchPosts(communityName) {
+    db.ref('posts/' + communityName).once('value').then((snapshot) => {
+        postsList.innerHTML = '';
+        snapshot.forEach((childSnapshot) => {
+            const post = childSnapshot.val();
+            const postDiv = document.createElement('div');
+            postDiv.textContent = post.content;
+            postsList.appendChild(postDiv);
+        });
+    });
+}
+
+// Post content to a community
+postButton.addEventListener('click', () => {
+    const content = postInput.value.trim();
+    const communityName = currentCommunityName.textContent;
+    if (content && communityName) {
+        const newPostKey = db.ref('posts/' + communityName).push().key;
+        db.ref('posts/' + communityName + '/' + newPostKey).set({
+            content: content
+        }).then(() => {
+            postInput.value = '';
+            fetchPosts(communityName);
+        }).catch((error) => {
+            console.error("Error posting:", error);
+        });
+    }
+});
