@@ -5,136 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ConvoSpace</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #f5f5f5;
-        }
-
-        .container {
-            max-width: 600px;
-            width: 100%;
-            background-color: #fff;
-            padding: 20px;
-            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        h1, h2, h3 {
-            color: #333;
-        }
-
-        button {
-            background-color: #007BFF;
-            color: #fff;
-            border: none;
-            padding: 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 5px;
-            font-size: 1rem;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        input, textarea {
-            width: 100%;
-            padding: 8px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 1rem;
-        }
-
-        .post, .comment {
-            background-color: #f0f0f0;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-        }
-
-        .community, .comment {
-            cursor: pointer;
-        }
-
-        #posts-list, #communities-list, #comments-list {
-            max-height: 300px;
-            overflow-y: auto;
-            border-top: 1px solid #ccc;
-            padding-top: 10px;
-            margin-top: 10px;
-        }
-
-        .profile-picture {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            margin-right: 10px;
-            object-fit: cover;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-        }
-
-        .tag {
-            background-color: #e0e0e0;
-            border-radius: 3px;
-            padding: 2px 5px;
-            margin: 2px;
-            display: inline-block;
-        }
+        /* Styling here */
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="auth-section">
-            <h1>Welcome to ConvoSpace</h1>
-            <label for="username-input">Choose a username:</label>
-            <input type="text" id="username-input" placeholder="Enter username">
-            <label for="profile-picture-input">Upload a profile picture:</label>
-            <input type="file" id="profile-picture-input" accept="image/*">
-            <button id="register-button">Register</button>
-            <button id="login-button">Login</button>
-            <button id="login-anonymous">Login Anonymously</button>
-        </div>
-
-        <div id="user-info" class="hidden">
-            <div class="user-info">
-                <img id="profile-picture" class="profile-picture hidden" alt="Profile Picture">
-                <h2>Hello, <span id="user-name"></span>!</h2>
-            </div>
-            <button id="logout">Logout</button>
-
-            <h3>Create a Community</h3>
-            <input type="text" id="community-name" placeholder="Community Name">
-            <button id="create-community">Create</button>
-
-            <h3>Communities</h3>
-            <div id="communities-list"></div>
-
-            <h3 id="current-community-name"></h3>
-            <div id="community-post-section" class="hidden">
-                <h3>Post in Community</h3>
-                <textarea id="post-input" placeholder="What's on your mind?"></textarea>
-                <input type="file" id="post-image" accept="image/*">
-                <input type="text" id="tags-input" placeholder="Add tags (comma separated)">
-                <button id="post-button">Post</button>
-                <h3>Posts</h3>
-                <div id="posts-list"></div>
-            </div>
-        </div>
+        <!-- HTML structure for auth, communities, posts, and comments here -->
     </div>
 
     <!-- Firebase SDKs -->
@@ -145,7 +21,7 @@
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyBzfN_BtTw0JMgkn9D5apkrH9h4QV0jwY0",
+            apiKey: "API_KEY_HERE",
             authDomain: "convospace-e4d4f.firebaseapp.com",
             databaseURL: "https://convospace-e4d4f-default-rtdb.firebaseio.com",
             projectId: "convospace-e4d4f",
@@ -183,7 +59,7 @@
         let profilePictureUrl = null;
 
         // Forbidden words to check in community name and posts
-        const forbiddenWords = ["18+", "strip", "diddy", "gangbang", "sex", "bar","ass","👅"];
+        const forbiddenWords = ["18+", "strip", "diddy", "gangbang", "sex", "bar", "ass", "👅"];
 
         auth.onAuthStateChanged((user) => {
             if (user) {
@@ -274,7 +150,21 @@
                     const communityDiv = document.createElement('div');
                     communityDiv.textContent = community.name;
                     communityDiv.classList.add('community');
-                    communityDiv.addEventListener('click', () => viewCommunity(childSnapshot.key, community.name));
+                    
+                    // Check for forbidden words and add warning on click
+                    communityDiv.addEventListener('click', () => {
+                        const communityNameLower = community.name.toLowerCase();
+                        const hasForbiddenWords = forbiddenWords.some(word => communityNameLower.includes(word));
+
+                        if (hasForbiddenWords) {
+                            if (confirm('This community contains explicit content. Are you sure you want to continue?')) {
+                                viewCommunity(childSnapshot.key, community.name);
+                            }
+                        } else {
+                            viewCommunity(childSnapshot.key, community.name);
+                        }
+                    });
+
                     communitiesList.appendChild(communityDiv);
                 });
             });
@@ -330,50 +220,8 @@
                             <strong>${post.userName}</strong><br>
                             <p>${post.text}</p>
                             <div>${post.tags.join(', ')}</div>
-                            <div class="comment-form">
-                                <input type="text" class="comment-input" placeholder="Add a comment">
-                                <button class="comment-button">Comment</button>
-                            </div>
-                            <div id="comments-list-${childSnapshot.key}" class="comments-list"></div>
                         `;
-                        postDiv.querySelector('.comment-button').addEventListener('click', () => addComment(childSnapshot.key));
                         postsList.appendChild(postDiv);
-
-                        fetchComments(childSnapshot.key);
-                    }
-                });
-            });
-        }
-
-        function addComment(postId) {
-            const commentInput = document.querySelector(`#comments-list-${postId} .comment-input`);
-            const commentText = commentInput.value.trim();
-
-            if (commentText) {
-                const newCommentKey = push(ref(db, 'comments')).key;
-                set(ref(db, `comments/${newCommentKey}`), {
-                    postId: postId,
-                    text: commentText,
-                    userName: userNameSpan.textContent,
-                    createdAt: new Date().toISOString()
-                });
-
-                commentInput.value = '';
-                fetchComments(postId);
-            }
-        }
-
-        function fetchComments(postId) {
-            get(ref(db, 'comments')).then((snapshot) => {
-                const commentsList = document.getElementById(`comments-list-${postId}`);
-                commentsList.innerHTML = '';
-                snapshot.forEach((childSnapshot) => {
-                    const comment = childSnapshot.val();
-                    if (comment.postId === postId) {
-                        const commentDiv = document.createElement('div');
-                        commentDiv.classList.add('comment');
-                        commentDiv.innerHTML = `<strong>${comment.userName}</strong>: ${comment.text}`;
-                        commentsList.appendChild(commentDiv);
                     }
                 });
             });
